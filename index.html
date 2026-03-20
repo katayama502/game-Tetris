@@ -364,8 +364,8 @@ canvas {
 
   <!-- Main Game Area -->
   <div style="position:relative;">
-    <canvas id="gameCanvas" width="300" height="600"></canvas>
-    <canvas id="effectCanvas" class="effect-canvas" width="300" height="600"></canvas>
+    <canvas id="gameCanvas" width="400" height="800"></canvas>
+    <canvas id="effectCanvas" class="effect-canvas" width="400" height="800"></canvas>
     <div class="combo-display" id="comboAnim"></div>
     <div class="overlay" id="startOverlay">
       <h2>TETRIS ULTRA</h2>
@@ -451,7 +451,71 @@ const pctx = pCanvas.getContext('2d');
 pCanvas.width = window.innerWidth;
 pCanvas.height = window.innerHeight;
 
-const COLS = 10, ROWS = 20, BLOCK = 30;
+const AudioContext = window.AudioContext || window.webkitAudioContext;
+let audioCtx = null;
+function initAudio() {
+  if (!audioCtx) {
+    audioCtx = new AudioContext();
+  }
+  if (audioCtx.state === 'suspended') {
+    audioCtx.resume();
+  }
+}
+
+function playSound(type) {
+  if (!audioCtx) return;
+  const osc = audioCtx.createOscillator();
+  const gainNode = audioCtx.createGain();
+  osc.connect(gainNode);
+  gainNode.connect(audioCtx.destination);
+  const now = audioCtx.currentTime;
+  
+  if (type === 'move') {
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(300, now);
+    osc.frequency.exponentialRampToValueAtTime(600, now + 0.05);
+    gainNode.gain.setValueAtTime(0.05, now);
+    gainNode.gain.exponentialRampToValueAtTime(0.01, now + 0.05);
+    osc.start(now); osc.stop(now + 0.05);
+  } else if (type === 'rotate') {
+    osc.type = 'square';
+    osc.frequency.setValueAtTime(400, now);
+    gainNode.gain.setValueAtTime(0.05, now);
+    gainNode.gain.exponentialRampToValueAtTime(0.01, now + 0.05);
+    osc.start(now); osc.stop(now + 0.05);
+  } else if (type === 'drop') {
+    osc.type = 'triangle';
+    osc.frequency.setValueAtTime(150, now);
+    osc.frequency.exponentialRampToValueAtTime(50, now + 0.1);
+    gainNode.gain.setValueAtTime(0.1, now);
+    gainNode.gain.exponentialRampToValueAtTime(0.01, now + 0.1);
+    osc.start(now); osc.stop(now + 0.1);
+  } else if (type === 'clear') {
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(800, now);
+    osc.frequency.linearRampToValueAtTime(1200, now + 0.1);
+    osc.frequency.linearRampToValueAtTime(1600, now + 0.2);
+    gainNode.gain.setValueAtTime(0.1, now);
+    gainNode.gain.linearRampToValueAtTime(0.01, now + 0.3);
+    osc.start(now); osc.stop(now + 0.3);
+  } else if (type === 'gameover') {
+    osc.type = 'sawtooth';
+    osc.frequency.setValueAtTime(200, now);
+    osc.frequency.exponentialRampToValueAtTime(50, now + 1.0);
+    gainNode.gain.setValueAtTime(0.15, now);
+    gainNode.gain.exponentialRampToValueAtTime(0.01, now + 1.0);
+    osc.start(now); osc.stop(now + 1.0);
+  } else if (type === 'hold') {
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(400, now);
+    osc.frequency.linearRampToValueAtTime(600, now + 0.1);
+    gainNode.gain.setValueAtTime(0.05, now);
+    gainNode.gain.linearRampToValueAtTime(0.01, now + 0.1);
+    osc.start(now); osc.stop(now + 0.1);
+  }
+}
+
+const COLS = 10, ROWS = 20, BLOCK = 40;
 const COLORS = {
   I: '#00f5ff', O: '#ffbe0b', T: '#8338ec', S: '#06d6a0',
   Z: '#ff006e', J: '#4361ee', L: '#fb5607',
@@ -538,6 +602,7 @@ function getNextFromBag() {
 }
 
 function startGame() {
+  initAudio();
   board = createBoard();
   bag = initBag();
   nextPieces = [getNextFromBag(), getNextFromBag(), getNextFromBag()];
@@ -621,6 +686,7 @@ function hardDrop() {
     (currentPiece.y + currentPiece.matrix.length) * BLOCK + canvas.offsetTop,
     currentPiece.color, 8
   );
+  playSound('drop');
   lock();
 }
 
@@ -672,6 +738,7 @@ function gameTick() {
 
 function lock() {
   if (!currentPiece) return;
+  if (currentPiece.y > 0) playSound('drop');
 
   if (currentPiece.special === 'BOMB') {
     triggerBomb(); return;
@@ -730,6 +797,8 @@ function clearLines() {
     return;
   }
 
+  playSound('clear');
+
   animateClearLines(clearedRows, ()=>{
     for(const r of clearedRows) {
       board.splice(r,1);
@@ -774,7 +843,7 @@ function animateClearLines(rows, cb) {
   let alpha = 1;
   const anim = () => {
     alpha -= 0.08;
-    ectx.clearRect(0,0,300,600);
+    ectx.clearRect(0,0,400,800);
     for(const r of rows) {
       ectx.save();
       ectx.globalAlpha = alpha;
@@ -785,7 +854,7 @@ function animateClearLines(rows, cb) {
       ectx.restore();
     }
     if(alpha>0) requestAnimationFrame(anim);
-    else { ectx.clearRect(0,0,300,600); cb(); }
+    else { ectx.clearRect(0,0,400,800); cb(); }
   };
   requestAnimationFrame(anim);
 }
@@ -872,9 +941,9 @@ function drawBlock(ctx, x, y, color, alpha=1, size=BLOCK) {
 }
 
 function drawBoard() {
-  ctx.clearRect(0,0,300,600);
+  ctx.clearRect(0,0,400,800);
   ctx.fillStyle = '#050508';
-  ctx.fillRect(0,0,300,600);
+  ctx.fillRect(0,0,400,800);
   for(let r=0;r<ROWS;r++)
     for(let c=0;c<COLS;c++) {
       ctx.strokeStyle = 'rgba(255,255,255,0.03)';
@@ -889,7 +958,7 @@ function drawBoard() {
     ctx.lineWidth = 3;
     ctx.shadowColor = `hsl(${(t*180)%360}, 100%, 60%)`;
     ctx.shadowBlur = 15;
-    ctx.strokeRect(1,1,298,598);
+    ctx.strokeRect(1,1,398,798);
     ctx.restore();
   }
 }
@@ -982,6 +1051,7 @@ function drawHold() {
 function hold() {
   if(!currentPiece||!canHold) return;
   canHold = false;
+  playSound('hold');
   if(holdPiece) {
     const tmp = holdPiece;
     holdPiece = {type:currentPiece.type, x:3, y:0, matrix: PIECES[currentPiece.type]?.map(r=>[...r])||currentPiece.matrix.map(r=>[...r]), color:currentPiece.color, rotation:0, special:currentPiece.special};
@@ -1008,6 +1078,7 @@ function updateDisplays() {
 function endGame() {
   gameRunning = false;
   clearInterval(dropTimer);
+  playSound('gameover');
   if(score>hiScore) { hiScore=score; localStorage.setItem('tetrisHiScore',hiScore); }
   document.getElementById('finalScore').textContent = score.toLocaleString();
   document.getElementById('finalLines').textContent = `Lines: ${lines}`;
@@ -1024,11 +1095,11 @@ document.addEventListener('keydown', e => {
     return;
   }
   if(gamePaused) return;
-  if(e.code==='ArrowLeft' && isValid(currentPiece,-1,0)) { currentPiece.x--; renderAll(); }
-  if(e.code==='ArrowRight' && isValid(currentPiece,1,0)) { currentPiece.x++; renderAll(); }
+  if(e.code==='ArrowLeft' && isValid(currentPiece,-1,0)) { currentPiece.x--; playSound('move'); renderAll(); }
+  if(e.code==='ArrowRight' && isValid(currentPiece,1,0)) { currentPiece.x++; playSound('move'); renderAll(); }
   if(e.code==='ArrowDown') { softDrop=true; }
-  if(e.code==='ArrowUp'||e.code==='KeyX') { tryRotate(1); renderAll(); }
-  if(e.code==='KeyZ') { tryRotate(-1); renderAll(); }
+  if(e.code==='ArrowUp'||e.code==='KeyX') { if(tryRotate(1)) playSound('rotate'); renderAll(); }
+  if(e.code==='KeyZ') { if(tryRotate(-1)) playSound('rotate'); renderAll(); }
   if(e.code==='Space') { e.preventDefault(); if(gameRunning)hardDrop(); }
   if(e.code==='KeyC') { hold(); renderAll(); }
   e.preventDefault();
